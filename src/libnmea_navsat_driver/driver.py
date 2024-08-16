@@ -47,7 +47,7 @@ class Ros2NMEADriver(Node):
         super().__init__('nmea_navsat_driver')
 
         self.fix_pub = self.create_publisher(NavSatFix, 'fix', 10)
-        self.vel_pub = self.create_publisher(TwistStamped, 'vel', 10)
+        self.vel_pub = self.create_publisher(TwistStamped, 'vel_raw', 10)
         self.heading_pub = self.create_publisher(QuaternionStamped, 'heading', 10)
         self.time_ref_pub = self.create_publisher(TimeReference, 'time_reference', 10)
 
@@ -186,9 +186,9 @@ class Ros2NMEADriver(Node):
                 self.alt_std_dev = default_epe * 2
 
             hdop = data['hdop']
-            current_fix.position_covariance[0] = (hdop * self.lon_std_dev) ** 2
-            current_fix.position_covariance[4] = (hdop * self.lat_std_dev) ** 2
-            current_fix.position_covariance[8] = (2 * hdop * self.alt_std_dev) ** 2  # FIXME
+            current_fix.position_covariance[0] = (hdop * self.lon_std_dev) ** 2 * 15
+            current_fix.position_covariance[4] = (hdop * self.lat_std_dev) ** 2 * 15
+            current_fix.position_covariance[8] = (2 * hdop * self.alt_std_dev) ** 2 * 4 # FIXME
 
             self.fix_pub.publish(current_fix)
 
@@ -231,10 +231,13 @@ class Ros2NMEADriver(Node):
                     longitude = -longitude
                 current_fix.longitude = longitude
 
-                current_fix.altitude = float('NaN')
+                current_fix.altitude = 0.0
                 current_fix.position_covariance_type = \
-                    NavSatFix.COVARIANCE_TYPE_UNKNOWN
+                    NavSatFix.COVARIANCE_TYPE_APPROXIMATED
 
+                current_fix.position_covariance[0] = 250.0
+                current_fix.position_covariance[4] = 250.0
+                current_fix.position_covariance[8] = 500.0
                 self.fix_pub.publish(current_fix)
 
                 if not math.isnan(data['utc_time']):

@@ -49,6 +49,11 @@ def main(args=None):
     try:
         GPS = serial.Serial(port=serial_port, baudrate=serial_baud, timeout=2)
         driver.get_logger().info("Successfully connected to {0} at {1}.".format(serial_port, serial_baud))
+        GPS.write(b'$PMTK251,115200*1F\r\n')  # Set baud rate to 115200
+        GPS.close()  # Close GPS serial port
+        GPS = serial.Serial(port=serial_port, baudrate=115200, timeout=2)
+        driver.get_logger().info("Successfully connected to {0} at {1}.".format(serial_port, 115200))
+        GPS.write(b'$PMTK220,100*2F\r\n')  # Set update rate to 10Hz
         try:
             while rclpy.ok():
                 data = GPS.readline().strip()
