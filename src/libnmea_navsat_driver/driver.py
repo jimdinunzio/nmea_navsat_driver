@@ -235,8 +235,8 @@ class Ros2NMEADriver(Node):
                 current_fix.position_covariance_type = \
                     NavSatFix.COVARIANCE_TYPE_APPROXIMATED
 
-                current_fix.position_covariance[0] = 250.0
-                current_fix.position_covariance[4] = 250.0
+                current_fix.position_covariance[0] = 300.0
+                current_fix.position_covariance[4] = 300.0
                 current_fix.position_covariance[8] = 500.0
                 self.fix_pub.publish(current_fix)
 
