@@ -117,6 +117,30 @@ class Ros2NMEADriver(Node):
             ]
         }
 
+        # Smoothing factor for the EMA (ema_alpha)
+        self.ema_alpha = self.declare_parameter('ema_alpha', 0.1).value
+        self.do_apply_ema = self.declare_parameter('do_apply_ema', False).value
+        
+        # Previous filtered values
+        self.filtered_latitude = None
+        self.filtered_longitude = None
+
+    # Function to Apply EMA for Latitude and Longitude
+    def apply_exponential_moving_average(self, new_value, prev_value):
+        """Apply the EMA to a given value."""
+        return self.ema_alpha * new_value + (1 - self.ema_alpha) * prev_value
+
+    def apply_ema(self, new_latitude, new_longitude):
+        # If this is the first data point, initialize the filtered values
+        if self.filtered_latitude is None:
+            self.filtered_latitude = new_latitude
+            self.filtered_longitude = new_longitude
+        else:
+            # Apply EMA to latitude and longitude separately
+            self.filtered_latitude = self.apply_exponential_moving_average(new_latitude, self.filtered_latitude)
+            self.filtered_longitude = self.apply_exponential_moving_average(new_longitude, self.filtered_longitude)
+        return self.filtered_latitude, self.filtered_longitude
+
     # Returns True if we successfully did something with the passed in
     # nmea_string
     def add_sentence(self, nmea_string, frame_id, timestamp=None):
@@ -166,12 +190,16 @@ class Ros2NMEADriver(Node):
             latitude = data['latitude']
             if data['latitude_direction'] == 'S':
                 latitude = -latitude
-            current_fix.latitude = latitude
 
             longitude = data['longitude']
             if data['longitude_direction'] == 'W':
                 longitude = -longitude
-            current_fix.longitude = longitude
+
+            if self.do_apply_ema:
+                current_fix.latitude, current_fix.longitude = self.apply_ema(latitude, longitude)
+            else:
+                current_fix.latitude = latitude
+                current_fix.longitude = longitude
 
             # Altitude is above ellipsoid, so adjust for mean-sea-level
             altitude = data['altitude'] + data['mean_sea_level']
@@ -186,8 +214,8 @@ class Ros2NMEADriver(Node):
                 self.alt_std_dev = default_epe * 2
 
             hdop = data['hdop']
-            current_fix.position_covariance[0] = (hdop * self.lon_std_dev) ** 2 * 15
-            current_fix.position_covariance[4] = (hdop * self.lat_std_dev) ** 2 * 15
+            current_fix.position_covariance[0] = (hdop * self.lon_std_dev) ** 2 * 10
+            current_fix.position_covariance[4] = (hdop * self.lat_std_dev) ** 2 * 10
             current_fix.position_covariance[8] = (2 * hdop * self.alt_std_dev) ** 2 * 4 # FIXME
 
             self.fix_pub.publish(current_fix)
@@ -224,20 +252,25 @@ class Ros2NMEADriver(Node):
                 latitude = data['latitude']
                 if data['latitude_direction'] == 'S':
                     latitude = -latitude
-                current_fix.latitude = latitude
 
                 longitude = data['longitude']
                 if data['longitude_direction'] == 'W':
                     longitude = -longitude
-                current_fix.longitude = longitude
+
+                if self.do_apply_ema:
+                    current_fix.latitude, current_fix.longitude = self.apply_ema(latitude, longitude)
+                else:
+                    current_fix.latitude = latitude
+                    current_fix.longitude = longitude
 
                 current_fix.altitude = 0.0
                 current_fix.position_covariance_type = \
                     NavSatFix.COVARIANCE_TYPE_APPROXIMATED
-
+                
                 current_fix.position_covariance[0] = 300.0
                 current_fix.position_covariance[4] = 300.0
                 current_fix.position_covariance[8] = 500.0
+
                 self.fix_pub.publish(current_fix)
 
                 if not math.isnan(data['utc_time']):

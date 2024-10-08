@@ -5,3 +5,6 @@ nmea_navsat_driver:
     frame_id: "gps"
     time_ref_source: "gps"
     useRMC: False
+    do_apply_ema: True
+    ema_alpha: 0.1
+    
